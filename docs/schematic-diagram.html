@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Moto Audio Unit — Interactive Schematic</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #1a1a2e; color: #e0e0e0; overflow-x: hidden; }
+
+  h1 { text-align: center; padding: 20px; font-size: 1.6em; color: #fff; letter-spacing: 1px; }
+  h1 span { color: #888; font-weight: 300; font-size: 0.7em; }
+
+  .controls { text-align: center; padding: 0 20px 15px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .controls button {
+    padding: 6px 14px; border: 1px solid #444; border-radius: 6px;
+    background: #2a2a3e; color: #ccc; cursor: pointer; font-size: 0.85em; transition: all 0.2s;
+  }
+  .controls button:hover { background: #3a3a5e; color: #fff; }
+  .controls button.active { background: #4a6fa5; border-color: #6a9fd5; color: #fff; }
+
+  .legend { display: flex; gap: 16px; justify-content: center; padding: 0 20px 15px; flex-wrap: wrap; font-size: 0.8em; }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-swatch { width: 28px; height: 4px; border-radius: 2px; }
+
+  svg { display: block; margin: 0 auto; }
+
+  .component {
+    cursor: pointer; transition: filter 0.2s, opacity 0.2s;
+  }
+  .component:hover { filter: brightness(1.3); }
+  .component.dimmed { opacity: 0.15; }
+  .component.highlighted { filter: brightness(1.2) drop-shadow(0 0 8px rgba(100,160,255,0.5)); }
+
+  .comp-box { rx: 6; ry: 6; stroke-width: 2; }
+  .comp-label { font-size: 11px; font-weight: 600; fill: #fff; text-anchor: middle; pointer-events: none; }
+  .comp-sublabel { font-size: 9px; fill: #aaa; text-anchor: middle; pointer-events: none; }
+  .comp-ref { font-size: 9px; fill: #888; text-anchor: middle; pointer-events: none; font-style: italic; }
+  .pin-label { font-size: 7.5px; fill: #999; pointer-events: none; }
+  .pin-dot { pointer-events: none; }
+
+  .net-line { stroke-width: 2; fill: none; opacity: 0.7; transition: opacity 0.2s, stroke-width 0.2s; }
+  .net-line.dimmed { opacity: 0.05; }
+  .net-line.highlighted { opacity: 1; stroke-width: 3; }
+
+  .net-label-bg { fill: #1a1a2e; opacity: 0.85; }
+  .net-label { font-size: 8px; fill: #ccc; text-anchor: middle; pointer-events: none; }
+
+  .section-label { font-size: 10px; fill: #555; text-anchor: middle; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; }
+  .section-box { fill: none; stroke: #2a2a3e; stroke-width: 1; stroke-dasharray: 4 2; rx: 10; ry: 10; }
+
+  #tooltip {
+    position: fixed; display: none; background: #2a2a3e; border: 1px solid #4a6fa5;
+    border-radius: 8px; padding: 12px 16px; max-width: 360px; z-index: 100;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5); font-size: 0.85em; line-height: 1.5;
+  }
+  #tooltip h3 { color: #6a9fd5; margin-bottom: 4px; font-size: 1em; }
+  #tooltip .tt-ref { color: #888; font-size: 0.85em; }
+  #tooltip .tt-pins { margin-top: 6px; }
+  #tooltip .tt-pins table { border-collapse: collapse; width: 100%; }
+  #tooltip .tt-pins td { padding: 2px 6px; border-bottom: 1px solid #333; font-size: 0.85em; }
+  #tooltip .tt-pins td:first-child { color: #8ab4f8; font-family: monospace; }
+  #tooltip .tt-net { color: #f0c040; font-family: monospace; font-size: 0.85em; }
+</style>
+</head>
+<body>
+
+<h1>Moto Audio Unit <span>Rev 2.0 — Interactive Schematic</span></h1>
+
+<div class="controls">
+  <button class="active" data-filter="all">All</button>
+  <button data-filter="power">Power</button>
+  <button data-filter="audio">Audio</button>
+  <button data-filter="bluetooth">Bluetooth</button>
+  <button data-filter="radio">Wired Radio</button>
+  <button data-filter="ui">UI / Controls</button>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:#e74c3c"></div> Power</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#3498db"></div> I2S Audio</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#2ecc71"></div> UART</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#f39c12"></div> GPIO / Control</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#9b59b6"></div> Analog Audio</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#1abc9c"></div> USB</div>
+</div>
+
+<svg id="schematic" viewBox="0 0 1100 680" width="100%" height="auto" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Section backgrounds -->
+  <rect class="section-box" x="15" y="30" width="310" height="280" data-section="power"/>
+  <text class="section-label" x="170" y="48">Power Management</text>
+
+  <rect class="section-box" x="340" y="30" width="400" height="280" data-section="audio"/>
+  <text class="section-label" x="540" y="48">Audio Chain</text>
+
+  <rect class="section-box" x="755" y="30" width="330" height="280" data-section="bluetooth"/>
+  <text class="section-label" x="920" y="48">Bluetooth Radios</text>
+
+  <rect class="section-box" x="15" y="330" width="310" height="170" data-section="radio"/>
+  <text class="section-label" x="170" y="348">Wired Radio Interface</text>
+
+  <rect class="section-box" x="340" y="330" width="400" height="170" data-section="ui"/>
+  <text class="section-label" x="540" y="348">UI &amp; Controls</text>
+
+  <rect class="section-box" x="755" y="330" width="330" height="170" data-section="connectors"/>
+  <text class="section-label" x="920" y="348">External Connectors</text>
+
+  <!-- ============================================ -->
+  <!-- COMPONENTS -->
+  <!-- ============================================ -->
+
+  <!-- U1: ESP32-S3 (center of everything) -->
+  <g class="component" data-id="U1" data-sections="power,audio,bluetooth,radio,ui" data-filter="all">
+    <rect class="comp-box" x="430" y="130" width="180" height="180" fill="#1e3a5f" stroke="#4a7fb5"/>
+    <text class="comp-label" x="520" y="158">ESP32-S3-WROOM-1</text>
+    <text class="comp-sublabel" x="520" y="172">BT Radio #1 — Phone A2DP/HFP</text>
+    <text class="comp-ref" x="520" y="186">U1</text>
+    <!-- Left pins -->
+    <circle class="pin-dot" cx="430" cy="155" r="3" fill="#e74c3c"/>
+    <text class="pin-label" x="437" y="158">3V3</text>
+    <circle class="pin-dot" cx="430" cy="170" r="3" fill="#e74c3c"/>
+    <text class="pin-label" x="437" y="173">GND</text>
+    <circle class="pin-dot" cx="430" cy="195" r="3" fill="#3498db"/>
+    <text class="pin-label" x="437" y="198">IO5 I2S_BCK</text>
+    <circle class="pin-dot" cx="430" cy="207" r="3" fill="#3498db"/>
+    <text class="pin-label" x="437" y="210">IO6 I2S_WS</text>
+    <circle class="pin-dot" cx="430" cy="219" r="3" fill="#3498db"/>
+    <text class="pin-label" x="437" y="222">IO7 I2S_DOUT</text>
+    <circle class="pin-dot" cx="430" cy="231" r="3" fill="#3498db"/>
+    <text class="pin-label" x="437" y="234">IO8 I2S_DIN</text>
+    <circle class="pin-dot" cx="430" cy="250" r="3" fill="#2ecc71"/>
+    <text class="pin-label" x="437" y="253">IO41 UART0_TX</text>
+    <circle class="pin-dot" cx="430" cy="262" r="3" fill="#2ecc71"/>
+    <text class="pin-label" x="437" y="265">IO42 UART0_RX</text>
+    <circle class="pin-dot" cx="430" cy="274" r="3" fill="#2ecc71"/>
+    <text class="pin-label" x="437" y="277">IO43 UART1_TX</text>
+    <circle class="pin-dot" cx="430" cy="286" r="3" fill="#2ecc71"/>
+    <text class="pin-label" x="437" y="289">IO44 UART1_RX</text>
+    <circle class="pin-dot" cx="430" cy="300" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="437" y="303">IO38 WS2812</text>
+    <!-- Right pins -->
+    <circle class="pin-dot" cx="610" cy="155" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="557" y="158">IO39 AMP_SD</text>
+    <circle class="pin-dot" cx="610" cy="170" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="550" y="173">IO40 WIRED_SQU</text>
+    <circle class="pin-dot" cx="610" cy="185" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="543" y="188">IO1 WIRED_PTT_OUT</text>
+    <circle class="pin-dot" cx="610" cy="200" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="548" y="203">IO2 WIRED_PTT_IN</text>
+    <circle class="pin-dot" cx="610" cy="220" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="557" y="223">IO3 BAT_DATA</text>
+    <circle class="pin-dot" cx="610" cy="235" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="553" y="238">IO4 BM62A_RST</text>
+    <circle class="pin-dot" cx="610" cy="250" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="551" y="253">IO47 BM62B_RST</text>
+    <circle class="pin-dot" cx="610" cy="265" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="543" y="268">IO48 BM62A_STATUS</text>
+    <circle class="pin-dot" cx="610" cy="280" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="543" y="283">IO45 BM62B_STATUS</text>
+    <circle class="pin-dot" cx="610" cy="295" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="543" y="298">IO21 WIRED_MIC_EN</text>
+    <circle class="pin-dot" cx="610" cy="145" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="549" y="148">IO15 PTT_EXT</text>
+    <circle class="pin-dot" cx="520" cy="310" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="497" y="307">IO16 ENC_A</text>
+    <circle class="pin-dot" cx="545" cy="310" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="533" y="307">IO17 ENC_B</text>
+    <circle class="pin-dot" cx="570" cy="310" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="558" y="307">IO18 ENC_SW</text>
+  </g>
+
+  <!-- U4: PCM5102A DAC -->
+  <g class="component" data-id="U4" data-sections="audio">
+    <rect class="comp-box" x="355" y="60" width="140" height="60" fill="#1a3350" stroke="#3498db"/>
+    <text class="comp-label" x="425" y="82">PCM5102A</text>
+    <text class="comp-sublabel" x="425" y="94">112dB SNR DAC</text>
+    <text class="comp-ref" x="425" y="106">U4</text>
+    <circle class="pin-dot" cx="355" cy="75" r="3" fill="#3498db"/>
+    <text class="pin-label" x="362" y="78">BCK</text>
+    <circle class="pin-dot" cx="355" cy="87" r="3" fill="#3498db"/>
+    <text class="pin-label" x="362" y="90">LRCK</text>
+    <circle class="pin-dot" cx="355" cy="99" r="3" fill="#3498db"/>
+    <text class="pin-label" x="362" y="102">DIN</text>
+    <circle class="pin-dot" cx="495" cy="75" r="3" fill="#9b59b6"/>
+    <text class="pin-label" x="474" y="78">LOUT</text>
+    <circle class="pin-dot" cx="495" cy="90" r="3" fill="#9b59b6"/>
+    <text class="pin-label" x="473" y="93">ROUT</text>
+    <circle class="pin-dot" cx="355" cy="66" r="3" fill="#e74c3c"/>
+    <text class="pin-label" x="362" y="69">DVDD/AVDD</text>
+  </g>
+
+  <!-- FB1: Ferrite Bead -->
+  <g class="component" data-id="FB1" data-sections="audio">
+    <rect class="comp-box" x="358" y="55" width="30" height="8" fill="#333" stroke="#666" rx="3" ry="3"/>
+    <text class="pin-label" x="373" y="53">FB1 AVDD filter</text>
+  </g>
+
+  <!-- U5: TPA6132A2 Amp -->
+  <g class="component" data-id="U5" data-sections="audio">
+    <rect class="comp-box" x="530" y="60" width="130" height="60" fill="#2d1a4e" stroke="#9b59b6"/>
+    <text class="comp-label" x="595" y="82">TPA6132A2</text>
+    <text class="comp-sublabel" x="595" y="94">IEM Headphone Amp</text>
+    <text class="comp-ref" x="595" y="106">U5</text>
+    <circle class="pin-dot" cx="530" cy="75" r="3" fill="#9b59b6"/>
+    <text class="pin-label" x="537" y="78">INL</text>
+    <circle class="pin-dot" cx="530" cy="90" r="3" fill="#9b59b6"/>
+    <text class="pin-label" x="537" y="93">INR</text>
+    <circle class="pin-dot" cx="660" cy="75" r="3" fill="#9b59b6"/>
+    <text class="pin-label" x="640" y="78">OUTL</text>
+    <circle class="pin-dot" cx="660" cy="90" r="3" fill="#9b59b6"/>
+    <text class="pin-label" x="638" y="93">OUTR</text>
+    <circle class="pin-dot" cx="530" cy="66" r="3" fill="#e74c3c"/>
+    <text class="pin-label" x="537" y="69">VDD 5V</text>
+    <circle class="pin-dot" cx="530" cy="105" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="537" y="108">/SD</text>
+  </g>
+
+  <!-- MIC1: SPM0687 -->
+  <g class="component" data-id="MIC1" data-sections="audio">
+    <rect class="comp-box" x="355" y="235" width="65" height="55" fill="#1a3a3a" stroke="#1abc9c"/>
+    <text class="comp-label" x="387" y="255">SPM0687</text>
+    <text class="comp-sublabel" x="387" y="267">MEMS Mic</text>
+    <text class="comp-ref" x="387" y="279">MIC1</text>
+    <circle class="pin-dot" cx="420" cy="255" r="3" fill="#3498db"/>
+    <text class="pin-label" x="410" y="252">DATA</text>
+    <circle class="pin-dot" cx="355" cy="255" r="3" fill="#3498db"/>
+    <text class="pin-label" x="362" y="258">CLK</text>
+  </g>
+
+  <!-- U2: BM62-A (Radio) -->
+  <g class="component" data-id="U2" data-sections="bluetooth">
+    <rect class="comp-box" x="790" y="60" width="140" height="80" fill="#1a4a1a" stroke="#2ecc71"/>
+    <text class="comp-label" x="860" y="82">BM62 (U2)</text>
+    <text class="comp-sublabel" x="860" y="94">BT Radio #2 — HFP</text>
+    <text class="comp-sublabel" x="860" y="106">UV-PRO / Ham Radio</text>
+    <text class="comp-ref" x="860" y="118">UART0</text>
+    <circle class="pin-dot" cx="790" cy="82" r="3" fill="#2ecc71"/>
+    <text class="pin-label" x="797" y="85">UART_RX</text>
+    <circle class="pin-dot" cx="790" cy="97" r="3" fill="#2ecc71"/>
+    <text class="pin-label" x="797" y="100">UART_TX</text>
+    <circle class="pin-dot" cx="790" cy="112" r="3" fill="#3498db"/>
+    <text class="pin-label" x="797" y="115">I2S CLK/WS/DIO</text>
+    <circle class="pin-dot" cx="930" cy="82" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="907" y="85">RST_N</text>
+    <circle class="pin-dot" cx="930" cy="97" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="898" y="100">BT_STATUS</text>
+    <circle class="pin-dot" cx="790" cy="70" r="3" fill="#e74c3c"/>
+    <text class="pin-label" x="797" y="73">VDD 3V3</text>
+  </g>
+
+  <!-- U3: BM62-B (Expansion) -->
+  <g class="component" data-id="U3" data-sections="bluetooth">
+    <rect class="comp-box" x="790" y="165" width="140" height="80" fill="#1a4a1a" stroke="#2ecc71"/>
+    <text class="comp-label" x="860" y="187">BM62 (U3)</text>
+    <text class="comp-sublabel" x="860" y="199">BT Radio #3 — Expansion</text>
+    <text class="comp-sublabel" x="860" y="211">Intercom / BS-PTT</text>
+    <text class="comp-ref" x="860" y="223">UART1</text>
+    <circle class="pin-dot" cx="790" cy="187" r="3" fill="#2ecc71"/>
+    <text class="pin-label" x="797" y="190">UART_RX</text>
+    <circle class="pin-dot" cx="790" cy="202" r="3" fill="#2ecc71"/>
+    <text class="pin-label" x="797" y="205">UART_TX</text>
+    <circle class="pin-dot" cx="790" cy="217" r="3" fill="#3498db"/>
+    <text class="pin-label" x="797" y="220">I2S CLK/WS/DIO</text>
+    <circle class="pin-dot" cx="930" cy="187" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="907" y="190">RST_N</text>
+    <circle class="pin-dot" cx="930" cy="202" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="898" y="205">BT_STATUS</text>
+    <circle class="pin-dot" cx="790" cy="175" r="3" fill="#e74c3c"/>
+    <text class="pin-label" x="797" y="178">VDD 3V3</text>
+  </g>
+
+  <!-- U7: TPS2116 Hot-swap Mux -->
+  <g class="component" data-id="U7" data-sections="power">
+    <rect class="comp-box" x="105" y="75" width="130" height="60" fill="#4a1a1a" stroke="#e74c3c"/>
+    <text class="comp-label" x="170" y="95">TPS2116</text>
+    <text class="comp-sublabel" x="170" y="107">Hot-swap Mux &lt;1μs</text>
+    <text class="comp-ref" x="170" y="119">U7</text>
+    <circle class="pin-dot" cx="105" cy="88" r="3" fill="#e74c3c"/>
+    <text class="pin-label" x="112" y="91">IN1 Main</text>
+    <circle class="pin-dot" cx="105" cy="103" r="3" fill="#e74c3c"/>
+    <text class="pin-label" x="112" y="106">IN2 Keep-alive</text>
+    <circle class="pin-dot" cx="235" cy="88" r="3" fill="#e74c3c"/>
+    <text class="pin-label" x="210" y="91">VOUT</text>
+  </g>
+
+  <!-- U6: IP5306 5V Boost -->
+  <g class="component" data-id="U6" data-sections="power">
+    <rect class="comp-box" x="260" y="75" width="60" height="60" fill="#4a1a1a" stroke="#e74c3c"/>
+    <text class="comp-label" x="290" y="95">IP5306</text>
+    <text class="comp-sublabel" x="290" y="107">5V Boost</text>
+    <text class="comp-ref" x="290" y="119">U6</text>
+    <circle class="pin-dot" cx="260" cy="95" r="3" fill="#e74c3c"/>
+    <text class="pin-label" x="246" y="98">BAT+</text>
+    <circle class="pin-dot" cx="320" cy="95" r="3" fill="#e74c3c"/>
+    <text class="pin-label" x="310" y="108">5V</text>
+  </g>
+
+  <!-- U8: AMS1117-3.3 LDO -->
+  <g class="component" data-id="U8" data-sections="power">
+    <rect class="comp-box" x="260" y="155" width="60" height="45" fill="#4a1a1a" stroke="#e74c3c"/>
+    <text class="comp-label" x="290" y="172">AMS1117</text>
+    <text class="comp-sublabel" x="290" y="184">3.3V LDO</text>
+    <text class="comp-ref" x="290" y="192">U8</text>
+    <circle class="pin-dot" cx="260" cy="172" r="3" fill="#e74c3c"/>
+    <text class="pin-label" x="246" y="175">5V in</text>
+    <circle class="pin-dot" cx="320" cy="172" r="3" fill="#e74c3c"/>
+    <text class="pin-label" x="308" y="185">3V3</text>
+  </g>
+
+  <!-- U9: MCP73831 Keep-alive Charger -->
+  <g class="component" data-id="U9" data-sections="power">
+    <rect class="comp-box" x="105" y="155" width="130" height="55" fill="#4a1a1a" stroke="#e74c3c"/>
+    <text class="comp-label" x="170" y="172">MCP73831</text>
+    <text class="comp-sublabel" x="170" y="184">Keep-alive Charger</text>
+    <text class="comp-sublabel" x="170" y="196">100mA from USB</text>
+    <text class="comp-ref" x="170" y="205">U9</text>
+    <circle class="pin-dot" cx="105" cy="172" r="3" fill="#e74c3c"/>
+    <text class="pin-label" x="112" y="175">VDD (USB)</text>
+    <circle class="pin-dot" cx="235" cy="172" r="3" fill="#e74c3c"/>
+    <text class="pin-label" x="218" y="175">VBAT</text>
+  </g>
+
+  <!-- J1: USB-C -->
+  <g class="component" data-id="J1" data-sections="power">
+    <rect class="comp-box" x="30" y="115" width="55" height="55" fill="#0a2a2a" stroke="#1abc9c"/>
+    <text class="comp-label" x="57" y="135">USB-C</text>
+    <text class="comp-sublabel" x="57" y="147">Charge</text>
+    <text class="comp-sublabel" x="57" y="157">+ Flash</text>
+    <text class="comp-ref" x="57" y="166">J1</text>
+    <circle class="pin-dot" cx="85" cy="130" r="3" fill="#e74c3c"/>
+    <text class="pin-label" x="78" y="127">VBUS</text>
+    <circle class="pin-dot" cx="85" cy="150" r="3" fill="#1abc9c"/>
+    <text class="pin-label" x="73" y="147">D+/D-</text>
+  </g>
+
+  <!-- J4: Battery Pogo -->
+  <g class="component" data-id="J4" data-sections="power">
+    <rect class="comp-box" x="30" y="55" width="55" height="45" fill="#3a2a0a" stroke="#f39c12"/>
+    <text class="comp-label" x="57" y="72">Battery</text>
+    <text class="comp-sublabel" x="57" y="83">4-pin Pogo</text>
+    <text class="comp-ref" x="57" y="93">J4</text>
+    <circle class="pin-dot" cx="85" cy="70" r="3" fill="#e74c3c"/>
+    <text class="pin-label" x="73" y="67">BAT+</text>
+    <circle class="pin-dot" cx="85" cy="85" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="68" y="82">DATA/NTC</text>
+  </g>
+
+  <!-- J5: Keep-alive JST -->
+  <g class="component" data-id="J5" data-sections="power">
+    <rect class="comp-box" x="30" y="215" width="55" height="40" fill="#3a2a0a" stroke="#f39c12"/>
+    <text class="comp-label" x="57" y="232">400mAh</text>
+    <text class="comp-sublabel" x="57" y="243">Keep-alive</text>
+    <text class="comp-ref" x="57" y="252">J5 JST-PH2</text>
+    <circle class="pin-dot" cx="85" cy="232" r="3" fill="#e74c3c"/>
+    <text class="pin-label" x="73" y="229">BAT+</text>
+  </g>
+
+  <!-- J3: TRRS Radio -->
+  <g class="component" data-id="J3" data-sections="radio">
+    <rect class="comp-box" x="30" y="365" width="100" height="70" fill="#3a2a0a" stroke="#f39c12"/>
+    <text class="comp-label" x="80" y="385">3.5mm TRRS</text>
+    <text class="comp-sublabel" x="80" y="397">Wired Radio Jack</text>
+    <text class="comp-sublabel" x="80" y="409">K1 Cable</text>
+    <text class="comp-ref" x="80" y="425">J3</text>
+    <circle class="pin-dot" cx="130" cy="378" r="3" fill="#9b59b6"/>
+    <text class="pin-label" x="115" y="375">TIP/SPK</text>
+    <circle class="pin-dot" cx="130" cy="393" r="3" fill="#9b59b6"/>
+    <text class="pin-label" x="110" y="390">RING1/MIC</text>
+    <circle class="pin-dot" cx="130" cy="408" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="113" y="405">RING2/PTT</text>
+    <circle class="pin-dot" cx="130" cy="423" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="107" y="420">SLEEVE/GND</text>
+  </g>
+
+  <!-- J7: Ext PTT -->
+  <g class="component" data-id="J7" data-sections="radio">
+    <rect class="comp-box" x="30" y="455" width="100" height="40" fill="#3a2a0a" stroke="#f39c12"/>
+    <text class="comp-label" x="80" y="472">2.5mm PTT</text>
+    <text class="comp-sublabel" x="80" y="484">Ext PTT Jack</text>
+    <text class="comp-ref" x="80" y="492">J7</text>
+    <circle class="pin-dot" cx="130" cy="472" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="116" y="469">TIP/PTT</text>
+  </g>
+
+  <!-- J2: Helmet Connector -->
+  <g class="component" data-id="J2" data-sections="audio">
+    <rect class="comp-box" x="775" y="365" width="120" height="70" fill="#3a1a3a" stroke="#9b59b6"/>
+    <text class="comp-label" x="835" y="385">Helmet Connector</text>
+    <text class="comp-sublabel" x="835" y="397">5-pin Magnetic Pogo</text>
+    <text class="comp-sublabel" x="835" y="409">IEM L/R + Mic Diff</text>
+    <text class="comp-ref" x="835" y="425">J2</text>
+    <circle class="pin-dot" cx="775" cy="378" r="3" fill="#9b59b6"/>
+    <text class="pin-label" x="782" y="381">IEM_L</text>
+    <circle class="pin-dot" cx="775" cy="393" r="3" fill="#9b59b6"/>
+    <text class="pin-label" x="782" y="396">IEM_R</text>
+    <circle class="pin-dot" cx="775" cy="408" r="3" fill="#1abc9c"/>
+    <text class="pin-label" x="782" y="411">MIC_P</text>
+    <circle class="pin-dot" cx="775" cy="423" r="3" fill="#1abc9c"/>
+    <text class="pin-label" x="782" y="426">MIC_N</text>
+  </g>
+
+  <!-- J6: Mic Pigtail JST -->
+  <g class="component" data-id="J6" data-sections="audio">
+    <rect class="comp-box" x="920" y="365" width="100" height="50" fill="#1a3a3a" stroke="#1abc9c"/>
+    <text class="comp-label" x="970" y="385">Mic Pigtail</text>
+    <text class="comp-sublabel" x="970" y="397">JST-GH2</text>
+    <text class="comp-ref" x="970" y="407">J6</text>
+    <circle class="pin-dot" cx="920" cy="385" r="3" fill="#1abc9c"/>
+    <text class="pin-label" x="910" y="382">DATA</text>
+  </g>
+
+  <!-- SW1: EC11 Encoder -->
+  <g class="component" data-id="SW1" data-sections="ui">
+    <rect class="comp-box" x="435" y="370" width="100" height="55" fill="#2a2a1a" stroke="#f39c12"/>
+    <text class="comp-label" x="485" y="390">EC11 Encoder</text>
+    <text class="comp-sublabel" x="485" y="402">Vol + Mute</text>
+    <text class="comp-sublabel" x="485" y="414">Socketed</text>
+    <text class="comp-ref" x="485" y="422">SW1</text>
+    <circle class="pin-dot" cx="435" cy="385" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="442" y="388">A → IO16</text>
+    <circle class="pin-dot" cx="435" cy="400" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="442" y="403">B → IO17</text>
+    <circle class="pin-dot" cx="435" cy="415" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="442" y="418">SW → IO18</text>
+  </g>
+
+  <!-- D1: WS2812B -->
+  <g class="component" data-id="D1" data-sections="ui">
+    <rect class="comp-box" x="570" y="370" width="90" height="55" fill="#2a2a1a" stroke="#f39c12"/>
+    <text class="comp-label" x="615" y="390">WS2812B</text>
+    <text class="comp-sublabel" x="615" y="402">Status LED</text>
+    <text class="comp-sublabel" x="615" y="414">2020 RGB</text>
+    <text class="comp-ref" x="615" y="422">D1</text>
+    <circle class="pin-dot" cx="570" cy="390" r="3" fill="#f39c12"/>
+    <text class="pin-label" x="577" y="393">DIN ← IO38</text>
+    <circle class="pin-dot" cx="570" cy="405" r="3" fill="#e74c3c"/>
+    <text class="pin-label" x="577" y="408">VDD 3V3</text>
+  </g>
+
+  <!-- Pullup resistor annotations -->
+  <g class="component" data-id="pullups" data-sections="radio,ui">
+    <text class="pin-label" x="175" y="365" style="font-size:8px; fill:#666">R2 10k pu (PTT_EXT)</text>
+    <text class="pin-label" x="175" y="375" style="font-size:8px; fill:#666">R3/R4/R5 10k pu (ENC)</text>
+    <text class="pin-label" x="175" y="385" style="font-size:8px; fill:#666">R6 100Ω series (WS2812)</text>
+    <text class="pin-label" x="175" y="395" style="font-size:8px; fill:#666">R9 10k pu (NTC)</text>
+    <text class="pin-label" x="175" y="405" style="font-size:8px; fill:#666">R10 10k pu (WIRED_PTT)</text>
+    <text class="pin-label" x="175" y="415" style="font-size:8px; fill:#666">R7/R8 5.1k (USB CC1/CC2)</text>
+    <text class="pin-label" x="175" y="425" style="font-size:8px; fill:#666">R11 GND (TPS2116 PR, IN1 prio)</text>
+    <text class="pin-label" x="175" y="435" style="font-size:8px; fill:#666">R1 10k (MCP73831 PROG→100mA)</text>
+    <text class="pin-label" x="175" y="448" style="font-size:8px; fill:#555">C1-C9 bypass caps throughout</text>
+  </g>
+
+  <!-- ============================================ -->
+  <!-- NET CONNECTIONS (wires) -->
+  <!-- ============================================ -->
+
+  <!-- POWER: J4 BAT+ → TPS2116 IN1 -->
+  <path class="net-line" d="M85,70 L95,70 L95,88 L105,88" stroke="#e74c3c" data-net="BAT_MAIN" data-sections="power"/>
+  <!-- POWER: J5 BAT+ → TPS2116 IN2 -->
+  <path class="net-line" d="M85,232 L95,232 L95,103 L105,103" stroke="#e74c3c" data-net="BAT_KEEPALIVE" data-sections="power"/>
+  <!-- POWER: TPS2116 VOUT → IP5306 BAT+ -->
+  <path class="net-line" d="M235,88 L248,88 L248,95 L260,95" stroke="#e74c3c" data-net="VBAT_MUX" data-sections="power"/>
+  <!-- POWER: IP5306 5V → AMS1117 VIN -->
+  <path class="net-line" d="M320,95 L340,95 L340,172 L320,172" stroke="#e74c3c" data-net="+5V" data-sections="power"/>
+  <!-- POWER: IP5306 5V → TPA6132 VDD -->
+  <path class="net-line" d="M340,95 L340,66 L530,66" stroke="#e74c3c" data-net="+5V" data-sections="power,audio"/>
+  <!-- POWER: AMS1117 3V3 → ESP32 -->
+  <path class="net-line" d="M320,172 L380,172 L380,155 L430,155" stroke="#e74c3c" data-net="+3V3" data-sections="power"/>
+  <!-- POWER: 3V3 → PCM5102A -->
+  <path class="net-line" d="M355,66 L345,66 L345,155 L380,155" stroke="#e74c3c" data-net="+3V3" data-sections="power,audio"/>
+  <!-- POWER: 3V3 → BM62-A -->
+  <path class="net-line" d="M380,155 L380,42 L770,42 L770,70 L790,70" stroke="#e74c3c" data-net="+3V3" data-sections="power,bluetooth"/>
+  <!-- POWER: 3V3 → BM62-B -->
+  <path class="net-line" d="M770,70 L770,175 L790,175" stroke="#e74c3c" data-net="+3V3" data-sections="power,bluetooth"/>
+  <!-- POWER: USB VBUS → MCP73831 -->
+  <path class="net-line" d="M85,130 L95,130 L95,172 L105,172" stroke="#e74c3c" data-net="VBUS" data-sections="power"/>
+  <!-- POWER: MCP73831 VBAT → J5 (charges keep-alive) -->
+  <path class="net-line" d="M235,172 L248,172 L248,232 L85,232" stroke="#e74c3c" stroke-dasharray="4 2" data-net="KA_CHARGE" data-sections="power"/>
+  <!-- POWER: USB VBUS → J4 VBUS passthrough -->
+  <path class="net-line" d="M85,130 L95,130 L95,50 L90,50 L90,85 L85,85" stroke="#1abc9c" stroke-dasharray="4 2" data-net="VBUS_CHGPASS" data-sections="power"/>
+
+  <!-- I2S: ESP32 → PCM5102A DAC -->
+  <path class="net-line" d="M430,195 L350,195 L350,75 L355,75" stroke="#3498db" data-net="I2S_BCK" data-sections="audio"/>
+  <path class="net-line" d="M430,207 L345,207 L345,87 L355,87" stroke="#3498db" data-net="I2S_WS" data-sections="audio"/>
+  <path class="net-line" d="M430,219 L340,219 L340,99 L355,99" stroke="#3498db" data-net="I2S_DOUT" data-sections="audio"/>
+
+  <!-- I2S: ESP32 ← SPM0687 MIC PDM DATA -->
+  <path class="net-line" d="M430,231 L420,255" stroke="#3498db" data-net="I2S_DIN/MIC_PDM" data-sections="audio"/>
+  <!-- I2S: ESP32 BCK → SPM0687 CLK -->
+  <path class="net-line" d="M350,195 L350,255 L355,255" stroke="#3498db" stroke-dasharray="4 2" data-net="I2S_BCK→MIC_CLK" data-sections="audio"/>
+
+  <!-- I2S: shared bus → BM62-A -->
+  <path class="net-line" d="M350,75 L350,42 L770,42 L770,112 L790,112" stroke="#3498db" stroke-dasharray="4 2" data-net="I2S_BUS→BM62" data-sections="audio,bluetooth"/>
+  <!-- I2S: shared bus → BM62-B -->
+  <path class="net-line" d="M770,112 L770,217 L790,217" stroke="#3498db" stroke-dasharray="4 2" data-net="I2S_BUS→BM62" data-sections="audio,bluetooth"/>
+
+  <!-- ANALOG: PCM5102A LOUT/ROUT → TPA6132A2 INL/INR -->
+  <path class="net-line" d="M495,75 L530,75" stroke="#9b59b6" data-net="DAC_L" data-sections="audio"/>
+  <path class="net-line" d="M495,90 L530,90" stroke="#9b59b6" data-net="DAC_R" data-sections="audio"/>
+
+  <!-- ANALOG: TPA6132A2 → Helmet Connector J2 -->
+  <path class="net-line" d="M660,75 L720,75 L720,378 L775,378" stroke="#9b59b6" data-net="IEM_L" data-sections="audio"/>
+  <path class="net-line" d="M660,90 L730,90 L730,393 L775,393" stroke="#9b59b6" data-net="IEM_R" data-sections="audio"/>
+
+  <!-- MIC: J6 pigtail → Helmet J2 MIC -->
+  <path class="net-line" d="M920,385 L905,385 L905,408 L895,408 L775,408" stroke="#1abc9c" data-net="MIC_P" data-sections="audio"/>
+  <path class="net-line" d="M920,385 L905,385 L905,423 L775,423" stroke="#1abc9c" stroke-dasharray="3 2" data-net="MIC_N" data-sections="audio"/>
+
+  <!-- UART0: ESP32 → BM62-A -->
+  <path class="net-line" d="M430,250 L415,250 L415,300 L760,300 L760,82 L790,82" stroke="#2ecc71" data-net="UART0_TX" data-sections="bluetooth"/>
+  <path class="net-line" d="M430,262 L410,262 L410,295 L755,295 L755,97 L790,97" stroke="#2ecc71" data-net="UART0_RX" data-sections="bluetooth"/>
+
+  <!-- UART1: ESP32 → BM62-B -->
+  <path class="net-line" d="M430,274 L405,274 L405,305 L750,305 L750,187 L790,187" stroke="#2ecc71" data-net="UART1_TX" data-sections="bluetooth"/>
+  <path class="net-line" d="M430,286 L400,286 L400,310 L745,310 L745,202 L790,202" stroke="#2ecc71" data-net="UART1_RX" data-sections="bluetooth"/>
+
+  <!-- GPIO: ESP32 IO39 → TPA6132 /SD -->
+  <path class="net-line" d="M610,155 L640,155 L640,105 L530,105" stroke="#f39c12" data-net="AMP_SD" data-sections="audio"/>
+
+  <!-- GPIO: ESP32 IO4 → BM62-A RST -->
+  <path class="net-line" d="M610,235 L700,235 L700,82 L930,82" stroke="#f39c12" data-net="BM62A_RST" data-sections="bluetooth"/>
+  <!-- GPIO: ESP32 IO47 → BM62-B RST -->
+  <path class="net-line" d="M610,250 L695,250 L695,187 L930,187" stroke="#f39c12" data-net="BM62B_RST" data-sections="bluetooth"/>
+  <!-- GPIO: ESP32 IO48 → BM62-A STATUS -->
+  <path class="net-line" d="M610,265 L705,265 L705,97 L930,97" stroke="#f39c12" data-net="BM62A_STATUS" data-sections="bluetooth"/>
+  <!-- GPIO: ESP32 IO45 → BM62-B STATUS -->
+  <path class="net-line" d="M610,280 L710,280 L710,202 L930,202" stroke="#f39c12" data-net="BM62B_STATUS" data-sections="bluetooth"/>
+
+  <!-- GPIO: ESP32 → Wired radio signals -->
+  <path class="net-line" d="M610,170 L680,170 L680,460 L240,460 L240,378 L130,378" stroke="#f39c12" data-net="WIRED_SQU (IO40)" data-sections="radio"/>
+  <path class="net-line" d="M610,185 L675,185 L675,465 L235,465 L235,408 L130,408" stroke="#f39c12" data-net="WIRED_PTT_OUT (IO1)" data-sections="radio"/>
+  <path class="net-line" d="M610,200 L670,200 L670,470 L230,470 L230,393 L130,393" stroke="#f39c12" data-net="WIRED_PTT_IN (IO2)" data-sections="radio"/>
+  <path class="net-line" d="M610,295 L685,295 L685,475 L245,475 L245,423 L130,423" stroke="#f39c12" data-net="WIRED_MIC_EN (IO21)" data-sections="radio"/>
+
+  <!-- GPIO: ESP32 IO15 → J7 Ext PTT -->
+  <path class="net-line" d="M610,145 L665,145 L665,472 L130,472" stroke="#f39c12" data-net="PTT_EXT (IO15)" data-sections="radio"/>
+
+  <!-- GPIO: ESP32 IO3 → J4 NTC/DATA -->
+  <path class="net-line" d="M610,220 L645,220 L645,320 L340,320 L340,290 L95,290 L95,85 L85,85" stroke="#f39c12" data-net="BAT_DATA (IO3)" data-sections="power"/>
+
+  <!-- GPIO: ESP32 → Encoder -->
+  <path class="net-line" d="M520,310 L520,350 L475,350 L475,370 L435,385" stroke="#f39c12" data-net="ENC_A (IO16)" data-sections="ui"/>
+  <path class="net-line" d="M545,310 L545,355 L465,355 L465,375 L435,400" stroke="#f39c12" data-net="ENC_B (IO17)" data-sections="ui"/>
+  <path class="net-line" d="M570,310 L570,345 L555,345 L555,375 L535,415 L435,415" stroke="#f39c12" data-net="ENC_SW (IO18)" data-sections="ui"/>
+
+  <!-- GPIO: ESP32 IO38 → WS2812B DIN -->
+  <path class="net-line" d="M430,300 L420,300 L420,330 L560,330 L560,390 L570,390" stroke="#f39c12" data-net="WS2812_DATA (IO38)" data-sections="ui"/>
+
+  <!-- Net labels at midpoints -->
+  <g class="net-label-group" data-sections="audio">
+    <rect class="net-label-bg" x="350" y="186" width="42" height="12" rx="3"/>
+    <text class="net-label" x="371" y="195">I2S_BCK</text>
+  </g>
+  <g class="net-label-group" data-sections="audio">
+    <rect class="net-label-bg" x="500" y="68" width="26" height="12" rx="3"/>
+    <text class="net-label" x="513" y="77">DAC_L</text>
+  </g>
+  <g class="net-label-group" data-sections="power">
+    <rect class="net-label-bg" x="327" y="88" width="18" height="12" rx="3"/>
+    <text class="net-label" x="336" y="97">+5V</text>
+  </g>
+  <g class="net-label-group" data-sections="power">
+    <rect class="net-label-bg" x="342" y="148" width="22" height="12" rx="3"/>
+    <text class="net-label" x="353" y="157">+3V3</text>
+  </g>
+</svg>
+
+<div id="tooltip"></div>
+
+<script>
+const componentData = {
+  "U1": {
+    name: "ESP32-S3-WROOM-1-N8",
+    ref: "U1",
+    desc: "Main MCU + BT Radio #1 (Phone A2DP/HFP). Runs audio mixer, duck logic, BM62 UART control, all GPIO.",
+    footprint: "RF_Module:ESP32-S3-WROOM-1",
+    pins: [
+      ["3V3 / GND", "Power input from AMS1117 3.3V LDO"],
+      ["IO5", "I2S BCK — shared clock to DAC, BM62s, Mic"],
+      ["IO6", "I2S WS/LRCK — word select"],
+      ["IO7", "I2S DOUT → PCM5102A DIN"],
+      ["IO8", "I2S DIN ← SPM0687 PDM DATA"],
+      ["IO41/42", "UART0 TX/RX → BM62-A (Radio HFP)"],
+      ["IO43/44", "UART1 TX/RX → BM62-B (Expansion)"],
+      ["IO1", "Wired radio PTT drive (open-drain, active low)"],
+      ["IO2", "Wired radio PTT sense (active low, R10 pullup)"],
+      ["IO3", "Battery NTC/DATA ADC (R9 10k pullup)"],
+      ["IO4", "BM62-A RST (active low)"],
+      ["IO47", "BM62-B RST (active low)"],
+      ["IO48", "BM62-A STATUS input"],
+      ["IO45", "BM62-B STATUS input"],
+      ["IO15", "Ext PTT jack J7 (active low, R2 pullup)"],
+      ["IO16/17/18", "EC11 encoder A/B/SW (R3-R5 pullups)"],
+      ["IO21", "Wired radio mic enable (high = active)"],
+      ["IO38", "WS2812B data (R6 100Ω series)"],
+      ["IO39", "TPA6132A2 /SD (low = shutdown)"],
+      ["IO40", "Wired radio squelch / cable detect"],
+    ]
+  },
+  "U2": {
+    name: "BM62SPKS1MC2",
+    ref: "U2 — BT Radio #2",
+    desc: "Bluetooth Classic HFP module for radio (e.g., BTECH UV-PRO). Controlled via UART0 AT commands from ESP32.",
+    footprint: "RF_Module:Microchip_BM62",
+    pins: [
+      ["VDD 3V3", "Power from AMS1117 LDO"],
+      ["UART_RX", "← ESP32 IO41 (UART0_TX)"],
+      ["UART_TX", "→ ESP32 IO42 (UART0_RX)"],
+      ["I2S CLK/WS/DIO", "Shared I2S bus with DAC and mic"],
+      ["RST_N", "← ESP32 IO4 (active low reset)"],
+      ["BT_STATUS", "→ ESP32 IO48"],
+    ]
+  },
+  "U3": {
+    name: "BM62SPKS1MC2",
+    ref: "U3 — BT Radio #3",
+    desc: "Bluetooth expansion module. Future use: intercom between riders, BS-PTT direct, or second phone. Controlled via UART1.",
+    footprint: "RF_Module:Microchip_BM62",
+    pins: [
+      ["VDD 3V3", "Power from AMS1117 LDO"],
+      ["UART_RX", "← ESP32 IO43 (UART1_TX)"],
+      ["UART_TX", "→ ESP32 IO44 (UART1_RX)"],
+      ["I2S CLK/WS/DIO", "Shared I2S bus with DAC and mic"],
+      ["RST_N", "← ESP32 IO47 (active low reset)"],
+      ["BT_STATUS", "→ ESP32 IO45"],
+    ]
+  },
+  "U4": {
+    name: "PCM5102A",
+    ref: "U4",
+    desc: "112dB SNR I2S DAC. Converts digital audio from ESP32 mixer to analog for the headphone amp. AVDD filtered through FB1 ferrite bead.",
+    footprint: "TSSOP-20",
+    pins: [
+      ["BCK", "← ESP32 IO5 (I2S bit clock)"],
+      ["LRCK", "← ESP32 IO6 (I2S word select)"],
+      ["DIN", "← ESP32 IO7 (I2S data out)"],
+      ["LOUT", "→ TPA6132A2 INL (analog left)"],
+      ["ROUT", "→ TPA6132A2 INR (analog right)"],
+      ["DVDD", "3.3V digital supply"],
+      ["AVDD", "3.3V analog supply via FB1 ferrite"],
+    ]
+  },
+  "U5": {
+    name: "TPA6132A2",
+    ref: "U5",
+    desc: "Headphone amplifier optimized for IEMs. 1Ω output impedance. Powered from 5V rail. Shutdown controlled by ESP32 IO39.",
+    footprint: "SOT-23-8",
+    pins: [
+      ["INL", "← PCM5102A LOUT"],
+      ["INR", "← PCM5102A ROUT"],
+      ["OUTL", "→ J2 IEM_L (helmet connector)"],
+      ["OUTR", "→ J2 IEM_R (helmet connector)"],
+      ["VDD", "5V from IP5306"],
+      ["/SD", "← ESP32 IO39 (low = shutdown)"],
+    ]
+  },
+  "U6": {
+    name: "IP5306",
+    ref: "U6",
+    desc: "LiPo charger + 5V boost converter. Takes muxed battery voltage from TPS2116, outputs 5V rail for amp and LDO.",
+    footprint: "SOP-8",
+    pins: [
+      ["BAT+", "← TPS2116 VOUT (muxed 3.7V)"],
+      ["VOUT 5V", "→ AMS1117 VIN, TPA6132A2 VDD"],
+    ]
+  },
+  "U7": {
+    name: "TPS2116DRLR",
+    ref: "U7",
+    desc: "Automatic power mux with <1μs switchover. IN1 (main battery pack) has priority; IN2 (keep-alive cell) is fallback during hot-swap.",
+    footprint: "SOT-23-6",
+    pins: [
+      ["IN1 Main", "← J4 BAT+ (main battery pack via pogo)"],
+      ["IN2 Keep-alive", "← J5 BAT+ (400mAh cell via JST)"],
+      ["VOUT", "→ IP5306 BAT+ input"],
+      ["PR", "→ GND via R11 (IN1 priority mode)"],
+      ["ST", "Status output (not connected)"],
+    ]
+  },
+  "U8": {
+    name: "AMS1117-3.3",
+    ref: "U8",
+    desc: "3.3V LDO regulator. Powers ESP32, both BM62 modules, PCM5102A DVDD, and SPM0687 mic.",
+    footprint: "SOT-223-3",
+    pins: [
+      ["VIN", "← IP5306 5V output"],
+      ["VOUT", "→ 3.3V rail (ESP32, BM62s, DAC, mic)"],
+    ]
+  },
+  "U9": {
+    name: "MCP73831T-2ACI/OT",
+    ref: "U9",
+    desc: "Single-cell LiPo charger for the 400mAh keep-alive cell. Charges at 100mA (set by R1 10k PROG resistor) from USB VBUS.",
+    footprint: "SOT-23-5",
+    pins: [
+      ["VDD", "← USB-C VBUS (J1)"],
+      ["VSS", "Ground"],
+      ["PROG", "R1 10k → sets 100mA charge current"],
+      ["VBAT", "→ J5 keep-alive cell BAT+"],
+      ["STAT", "Charge status output"],
+    ]
+  },
+  "MIC1": {
+    name: "Knowles SPM0687LR5H-1",
+    ref: "MIC1",
+    desc: "Differential MEMS microphone with PDM output. Mounted on pigtail cable (JST-GH2 J6), clips into helmet chin bar foam for wind noise rejection.",
+    footprint: "5.6x4.7mm",
+    pins: [
+      ["DATA", "→ ESP32 IO8 (I2S DIN, PDM mode)"],
+      ["CLK", "← ESP32 IO5 (shared I2S BCK)"],
+      ["SEL", "L/R channel select"],
+      ["VDD", "3.3V"],
+    ]
+  },
+  "J1": {
+    name: "USB-C Receptacle",
+    ref: "J1",
+    desc: "USB-C connector for charging (VBUS → IP5306, MCP73831) and ESP32 firmware flashing (D+/D-).",
+    footprint: "XKB U262-16XN-4BVC11",
+    pins: [
+      ["VBUS", "→ IP5306 VIN + MCP73831 VDD + J4 VBUS passthrough"],
+      ["D+/D-", "→ ESP32-S3 USB (firmware flash)"],
+      ["CC1/CC2", "5.1k pulldowns (R7/R8) for UFP detection"],
+    ]
+  },
+  "J2": {
+    name: "5-pin Magnetic Pogo Connector",
+    ref: "J2",
+    desc: "Helmet cable connector. Magnetic + keyed. Carries IEM stereo audio + differential mic signals. Snaps on, releases safely.",
+    footprint: "Custom pogo array",
+    pins: [
+      ["IEM_L", "← TPA6132A2 OUTL"],
+      ["IEM_R", "← TPA6132A2 OUTR"],
+      ["MIC_P", "Mic differential positive"],
+      ["MIC_N", "Mic differential negative"],
+      ["GND", "Ground"],
+    ]
+  },
+  "J3": {
+    name: "3.5mm TRRS Audio Jack",
+    ref: "J3",
+    desc: "Wired radio connection. CTIA pinout. Use K1 adapter cable for BTECH/Baofeng/Kenwood. SW_DETECT pin senses cable insertion.",
+    footprint: "AudioJack4_SwitchT",
+    pins: [
+      ["TIP / RADIO_SPK", "Radio speaker audio in → ESP32 ADC/mixer"],
+      ["RING1 / RADIO_MIC", "Mic audio out to radio (from MEMS)"],
+      ["RING2 / PTT", "Push-to-talk line (active low)"],
+      ["SLEEVE / GND", "Ground"],
+      ["SW_DETECT", "→ IO40 squelch / cable detect"],
+    ]
+  },
+  "J4": {
+    name: "4-pin Magnetic Pogo Battery",
+    ref: "J4",
+    desc: "Main battery pack connector. Magnetic pogo contacts for hot-swap. Carries battery power, ground, USB charge passthrough, and NTC/data.",
+    footprint: "Custom pogo array",
+    pins: [
+      ["BAT+", "→ TPS2116 IN1 (main power)"],
+      ["GND", "Ground"],
+      ["VBUS_CHGPASS", "USB VBUS passthrough to battery pack charge IC"],
+      ["DATA/NTC", "← ESP32 IO3 ADC (temp monitoring)"],
+    ]
+  },
+  "J5": {
+    name: "JST-PH2 Keep-alive Cell",
+    ref: "J5",
+    desc: "400mAh LiPo keep-alive cell. User-replaceable (JST connector). Maintains BT connections during main battery hot-swap.",
+    footprint: "JST_PH_S2B-PH-K",
+    pins: [
+      ["BAT+", "→ TPS2116 IN2 (fallback power) + MCP73831 VBAT (charging)"],
+      ["BAT-", "Ground"],
+    ]
+  },
+  "J6": {
+    name: "JST-GH2 Mic Pigtail",
+    ref: "J6",
+    desc: "Connector for the Knowles SPM0687 MEMS mic pigtail cable. Serviceable — user can replace mic without soldering.",
+    footprint: "JST_GH_SM02B-GHS-TB",
+    pins: [
+      ["MIC_DATA", "SPM0687 PDM data → ESP32 IO8"],
+      ["MIC_GND", "Ground"],
+    ]
+  },
+  "J7": {
+    name: "2.5mm External PTT Jack",
+    ref: "J7",
+    desc: "External push-to-talk button jack. 2.5mm mono. Active low with R2 10k pullup to 3V3. Routes to ESP32 IO15.",
+    footprint: "AudioJack2_SwitchT",
+    pins: [
+      ["TIP/PTT", "→ ESP32 IO15 (active low, R2 10k pullup)"],
+      ["SLV/GND", "Ground"],
+    ]
+  },
+  "SW1": {
+    name: "EC11 Rotary Encoder",
+    ref: "SW1",
+    desc: "Volume control (rotate) + mute (press). Socketed for easy replacement. R3/R4/R5 10k pullups on A/B/SW lines.",
+    footprint: "Alps EC11E vertical",
+    pins: [
+      ["A", "→ ESP32 IO16 (R3 10k pullup)"],
+      ["B", "→ ESP32 IO17 (R4 10k pullup)"],
+      ["COM", "Ground"],
+      ["SW", "→ ESP32 IO18 (R5 10k pullup) — mute"],
+    ]
+  },
+  "D1": {
+    name: "WS2812B-2020",
+    ref: "D1",
+    desc: "RGB status LED. Single addressable LED. Driven by ESP32 IO38 through R6 100Ω series resistor. See ARCHITECTURE.md for color/pattern codes.",
+    footprint: "LED_WS2812B-2020",
+    pins: [
+      ["DIN", "← ESP32 IO38 (via R6 100Ω)"],
+      ["VDD", "3.3V"],
+      ["DOUT", "Not connected (single LED)"],
+    ]
+  },
+  "FB1": {
+    name: "BLM18PG221SN1 Ferrite Bead",
+    ref: "FB1",
+    desc: "Ferrite bead on PCM5102A AVDD line. Filters digital noise from the 3.3V rail to keep the analog supply clean for the DAC.",
+    footprint: "0402",
+    pins: [
+      ["Pin 1", "← +3V3 rail"],
+      ["Pin 2", "→ PCM5102A AVDD"],
+    ]
+  },
+};
+
+// Tooltip
+const tooltip = document.getElementById('tooltip');
+const svg = document.getElementById('schematic');
+
+document.querySelectorAll('.component[data-id]').forEach(el => {
+  el.addEventListener('mouseenter', (e) => {
+    const id = el.dataset.id;
+    const data = componentData[id];
+    if (!data) return;
+
+    let pinRows = data.pins.map(p => `<tr><td>${p[0]}</td><td>${p[1]}</td></tr>`).join('');
+    tooltip.innerHTML = `
+      <h3>${data.name} <span class="tt-ref">${data.ref}</span></h3>
+      <div>${data.desc}</div>
+      <div style="margin-top:4px;color:#888;font-size:0.85em">Footprint: ${data.footprint}</div>
+      <div class="tt-pins"><table>${pinRows}</table></div>
+    `;
+    tooltip.style.display = 'block';
+    positionTooltip(e);
+  });
+
+  el.addEventListener('mousemove', positionTooltip);
+  el.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+
+  // Click to highlight connections
+  el.addEventListener('click', () => {
+    const id = el.dataset.id;
+    const sections = (el.dataset.sections || '').split(',');
+
+    const isAlreadyHighlighted = el.classList.contains('highlighted');
+
+    // Reset all
+    document.querySelectorAll('.component').forEach(c => c.classList.remove('dimmed', 'highlighted'));
+    document.querySelectorAll('.net-line').forEach(n => n.classList.remove('dimmed', 'highlighted'));
+
+    if (isAlreadyHighlighted) return; // toggle off
+
+    // Dim everything
+    document.querySelectorAll('.component[data-id]').forEach(c => c.classList.add('dimmed'));
+    document.querySelectorAll('.net-line').forEach(n => n.classList.add('dimmed'));
+
+    // Highlight this component
+    el.classList.remove('dimmed');
+    el.classList.add('highlighted');
+
+    // Highlight connected nets
+    document.querySelectorAll('.net-line').forEach(n => {
+      const netSections = (n.dataset.sections || '').split(',');
+      if (sections.some(s => netSections.includes(s))) {
+        n.classList.remove('dimmed');
+        n.classList.add('highlighted');
+      }
+    });
+
+    // Highlight connected components
+    document.querySelectorAll('.component[data-id]').forEach(c => {
+      if (c === el) return;
+      const cSections = (c.dataset.sections || '').split(',');
+      if (sections.some(s => cSections.includes(s))) {
+        c.classList.remove('dimmed');
+        c.classList.add('highlighted');
+      }
+    });
+  });
+});
+
+function positionTooltip(e) {
+  let x = e.clientX + 15;
+  let y = e.clientY + 15;
+  if (x + 360 > window.innerWidth) x = e.clientX - 375;
+  if (y + 300 > window.innerHeight) y = e.clientY - 310;
+  tooltip.style.left = x + 'px';
+  tooltip.style.top = y + 'px';
+}
+
+// Filter buttons
+document.querySelectorAll('.controls button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const filter = btn.dataset.filter;
+
+    // Reset
+    document.querySelectorAll('.component').forEach(c => c.classList.remove('dimmed', 'highlighted'));
+    document.querySelectorAll('.net-line').forEach(n => n.classList.remove('dimmed', 'highlighted'));
+    document.querySelectorAll('.net-label-group').forEach(n => n.style.opacity = '1');
+
+    if (filter === 'all') return;
+
+    // Dim non-matching
+    document.querySelectorAll('.component[data-sections]').forEach(c => {
+      const sections = c.dataset.sections.split(',');
+      if (!sections.includes(filter)) {
+        c.classList.add('dimmed');
+      }
+    });
+
+    document.querySelectorAll('.net-line').forEach(n => {
+      const sections = (n.dataset.sections || '').split(',');
+      if (!sections.includes(filter)) {
+        n.classList.add('dimmed');
+      }
+    });
+
+    document.querySelectorAll('.net-label-group').forEach(n => {
+      const sections = (n.dataset.sections || '').split(',');
+      if (!sections.includes(filter)) {
+        n.style.opacity = '0.1';
+      }
+    });
+  });
+});
+
+// Click on SVG background to reset
+svg.addEventListener('click', (e) => {
+  if (e.target === svg || e.target.classList.contains('section-box') || e.target.classList.contains('section-label')) {
+    document.querySelectorAll('.component').forEach(c => c.classList.remove('dimmed', 'highlighted'));
+    document.querySelectorAll('.net-line').forEach(n => n.classList.remove('dimmed', 'highlighted'));
+  }
+});
+</script>
+</body>
+</html>
