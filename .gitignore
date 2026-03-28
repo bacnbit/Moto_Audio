@@ -1,0 +1,49 @@
+# KiCad
+*.kicad_pcb-bak
+*.kicad_sch-bak
+*.kicad_pro-bak
+fp-info-cache
+_autosave-*
+*.lck
+*.000
+*.bak
+
+# KiCad outputs (generated, not source)
+hardware/kicad/gerbers/
+hardware/kicad/fab/
+
+# ESP-IDF build artifacts
+firmware/build/
+firmware/sdkconfig
+firmware/dependencies.lock
+firmware/managed_components/
+**/__pycache__/
+*.pyc
+.venv/
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+*.swp
+*.swo
+*~
+.idea/
+
+# 3D print sliced files (keep STLs, not gcode)
+*.gcode
+*.bgcode
+*.3mf
+
+# Fusion 360 backups
+*Recovery*
+
+# OS
+desktop.ini

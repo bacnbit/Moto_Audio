@@ -1,0 +1,27 @@
+Reference,Value,Footprint,Qty,Description,Manufacturer,MPN,LCSC,Datasheet,Notes
+U1,ESP32-S3-WROOM-1,RF_Module:ESP32-S3-WROOM-1,1,ESP32-S3 WiFi+BT MCU module 8MB flash,Espressif,ESP32-S3-WROOM-1-N8,C2913202,https://www.espressif.com/sites/default/files/documentation/esp32-s3-wroom-1_wroom-1u_datasheet_en.pdf,Dual BT Classic + BLE; I2S master
+U2,PCM5102A,Package_SO:TSSOP-20_4.4x6.5mm_P0.65mm,1,112dB SNR stereo DAC I2S,Texas Instruments,PCM5102APWR,C9676,https://www.ti.com/lit/ds/symlink/pcm5102a.pdf,AVDD needs ferrite bead separation from DVDD
+U3,TPA6132A2,Package_TO_SOT_SMD:SOT-23-8,1,Class G headphone amp 1-Ohm Zout,Texas Instruments,TPA6132A2DCKR,C2657,https://www.ti.com/lit/ds/symlink/tpa6132a2.pdf,Low Zout critical for IEM impedance curves
+U4,BM62SPKS1MC2,RF_Module:Microchip_BM62,1,Dual-mode BT Classic+BLE audio module,Microchip,BM62SPKS1MC2,n/a,https://ww1.microchip.com/downloads/en/DeviceDoc/BM62-datasheet-DS60001490.pdf,Expansion radio; UART ctrl from ESP32; initially unpaired
+U5,IP5306,Package_SO:SOP-8_3.9x4.9mm_P1.27mm,1,LiPo charger + 5V boost 2A,INJOINIC,IP5306,C181692,https://datasheet.lcsc.com/szlcsc/INJOINIC-IP5306_C181692.pdf,KEY pin: 10k to GND for auto-on
+U6,AMS1117-3.3,Package_TO_SOT_SMD:SOT-223-3_TabPin2,1,3.3V LDO 1A,Advanced Monolithic,AMS1117-3.3,C6186,http://www.advanced-monolithic.com/pdf/ds1117.pdf,Powers ESP32 + DAC + BM62 + Mic
+MIC1,SPM0687LR5H-1,Microphone:Knowles_SPM0687LR5H-1_5.6x4.7mm,1,Differential MEMS microphone PDM,Knowles,SPM0687LR5H-1,n/a,https://www.knowles.com/docs/default-source/model-downloads/spm0687lr5h-1-rev-f-datasheet.pdf,Mounted on pigtail to helmet chin bar; SEL→GND
+BT1,LiPo 3.7V 2000mAh,Connector_JST:JST_PH_S2B-PH-K_1x02_P2.00mm_Horizontal,1,Rechargeable LiPo flat cell JST-PH2,Generic,LP805060,n/a,~,Flat cell ~80x50x6mm; fits under PCB in enclosure
+J1,USB_C_Receptacle,Connector_USB:USB_C_Receptacle_XKB_U262-16XN-4BVC11,1,USB-C 16-pin receptacle charging+programming,XKB,U262-16XN-4BVC11,C165948,~,CC1+CC2 need 5.1k to GND for 5V sink (R5+R6)
+J2,5-pin Pogo Mag,Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical,1,5-pin magnetic pogo breakaway helmet connector,Custom,DIY pogo array,n/a,~,Print collar + neodymium ring; keyed tab; IEM_L/R + MIC_P/N + GND
+J3,2.5mm PTT Jack,Connector_AudioJack:AudioJack2_SwitchT,1,2.5mm mono audio jack external PTT,CUI Devices,SJ-2523-SMT-TR,C145890,~,Panel mount; wired to IO15 with R1 pullup
+SW1,EC11,Rotary_Encoder:RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm,1,Rotary encoder with pushbutton volume+mute,Alps,EC11E15244B1,C255515,~,A/B/SW on IO16/17/18; 10k pullups R2/R3/R7
+D1,WS2812B-2020,LED_SMD:LED_WS2812B-2020,1,Addressable RGB LED BT status,Worldsemi,WS2812B-2020,C965555,~,100R series R4; 5V supply; IO38 data
+FB1,BLM18PG221SN1,Inductor_SMD:L_0402_1005Metric,1,Ferrite bead 220R@100MHz AVDD isolation,Murata,BLM18PG221SN1D,C16934,~,Between 3V3 digital and PCM5102 AVDD
+C1,10uF,Capacitor_SMD:C_0402_1005Metric,1,ESP32 3V3 bulk decoupling,Generic,GRM155R61A106ME11,C19702,~,Place within 2mm of ESP32 3V3 pin
+C2,100nF,Capacitor_SMD:C_0402_1005Metric,1,ESP32 3V3 HF bypass,Generic,GRM155R71C104KA88,C307331,~,
+C3,10uF,Capacitor_SMD:C_0402_1005Metric,1,PCM5102 AVDD bulk decoupling,Generic,GRM155R61A106ME11,C19702,~,After FB1 on AVDD rail
+C4,100nF,Capacitor_SMD:C_0402_1005Metric,1,PCM5102 AVDD HF bypass,Generic,GRM155R71C104KA88,C307331,~,
+C5,1uF,Capacitor_SMD:C_0402_1005Metric,1,TPA6132 VDD bypass,Generic,GRM155R60J105KE19,C52923,~,Place within 1mm of VDD pin
+R1,10k,Resistor_SMD:R_0402_1005Metric,1,PTT_EXT GPIO pullup to 3V3,Generic,RC0402FR-0710KL,C98220,~,IO15 pulled high; PTT jack pulls low
+R2,10k,Resistor_SMD:R_0402_1005Metric,1,EC11 ENC_A pullup,Generic,RC0402FR-0710KL,C98220,~,
+R3,10k,Resistor_SMD:R_0402_1005Metric,1,EC11 ENC_B pullup,Generic,RC0402FR-0710KL,C98220,~,
+R4,100R,Resistor_SMD:R_0402_1005Metric,1,WS2812B data line series resistor,Generic,RC0402FR-07100RL,C98257,~,Prevents ringing on fast NZR data edges
+R5,5.1k,Resistor_SMD:R_0402_1005Metric,1,USB-C CC1 sink resistor,Generic,RC0402FR-075K1L,C138392,~,Required for USB-C 5V charging negotiation
+R6,5.1k,Resistor_SMD:R_0402_1005Metric,1,USB-C CC2 sink resistor,Generic,RC0402FR-075K1L,C138392,~,
+R7,10k,Resistor_SMD:R_0402_1005Metric,1,EC11 SW pullup,Generic,RC0402FR-0710KL,C98220,~,

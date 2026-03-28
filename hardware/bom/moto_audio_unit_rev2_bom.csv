@@ -1,0 +1,56 @@
+Reference,Value,Footprint,Qty,Description,MPN,LCSC,Notes
+U1,ESP32-S3-WROOM-1-N8,RF_Module:ESP32-S3-WROOM-1,1,BT Radio #1 — phone A2DP+HFP + main MCU,ESP32-S3-WROOM-1-N8,C2913202,Dual BT Classic + BLE; I2S master; UART0+1 for BM62 control
+U2,BM62SPKS1MC2,RF_Module:Microchip_BM62,1,BT Radio #2 — radio HFP (UV-PRO etc),BM62SPKS1MC2,n/a,UART0 ctrl; I2S audio; pairs to radio or any HFP device
+U3,BM62SPKS1MC2,RF_Module:Microchip_BM62,1,BT Radio #3 — expansion (BS-PTT / intercom / 2nd phone),BM62SPKS1MC2,n/a,UART1 ctrl; initially unpaired; future-proofed
+U4,PCM5102A,Package_SO:TSSOP-20_4.4x6.5mm_P0.65mm,1,112dB SNR I2S DAC,PCM5102APWR,C9676,FLT+DEMP+XSMT to GND; AVDD via FB1
+U5,TPA6132A2,Package_TO_SOT_SMD:SOT-23-8,1,IEM headphone amp 1-Ohm Zout,TPA6132A2DCKR,C2657,/SD driven by IO39; critical for IEM impedance
+U6,IP5306,Package_SO:SOP-8_3.9x4.9mm_P1.27mm,1,LiPo charger + 5V boost 2A,IP5306,C181692,KEY pin 10k to GND for auto-on; receives muxed battery voltage
+U7,TPS2116DRLR,Package_TO_SOT_SMD:SOT-23-6,1,Dual-input power mux hot-swap <1us,TPS2116DRLR,C601684,IN1=main pack (pogo) IN2=keep-alive; PR to GND = IN1 preferred
+U8,AMS1117-3.3,Package_TO_SOT_SMD:SOT-223-3_TabPin2,1,3.3V LDO 1A,AMS1117-3.3,C6186,Powers ESP32+DAC+BM62x2+Mic from 5V rail
+U9,MCP73831T-2ACI/OT,Package_TO_SOT_SMD:SOT-23-5,1,Keep-alive LiPo charger 100mA,MCP73831T-2ACI/OT,C14879,PROG=R1 10k sets 100mA; charges 400mAh cell from 5V USB
+MIC1,SPM0687LR5H-1,Microphone:Knowles_SPM0687LR5H-1_5.6x4.7mm,1,Differential MEMS mic PDM out,SPM0687LR5H-1,n/a,SEL to GND; mounted on JST-GH2 pigtail to helmet chin bar
+J1,USB_C_Receptacle,Connector_USB:USB_C_Receptacle_XKB_U262-16XN-4BVC11,1,USB-C charge + ESP32 flash + VBUS passthrough to pack,U262-16XN-4BVC11,C165948,R7+R8 5.1k CC resistors for 5V charging; D+D- to ESP32 IO19/20
+J2,Helmet 5-pin Pogo Mag,Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical,1,Magnetic pogo IEM+mic connector to helmet cable,Custom pogo array,n/a,P75-E2 spring pins; N52 8x3mm ring magnets; IEM_L/R + MIC_P/N + GND; keyed tab
+J3,3.5mm TRRS Radio Jack,Connector_AudioJack:AudioJack4_SwitchT,1,Wired radio input — CTIA TRRS pinout,CUI SJ-3524-SMT,C456220,Tip=RADIO_SPK Ring1=RADIO_MIC Ring2=PTT Sleeve=GND; SW_DETECT to IO40; K1 cable sold separately
+J4,4-pin Pogo Battery Contacts,Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical,1,Magnetic pogo battery interface on PCB bottom,P75-E2 x4 + N52 magnets,n/a,BAT+ GND VBUS_CHGPASS DATA/NTC; ENIG surface on mating pad side
+J5,JST-PH2 Keep-alive,Connector_JST:JST_PH_S2B-PH-K_1x02_P2.00mm_Horizontal,1,Serviceable 400mAh keep-alive LiPo connector,S2B-PH-K-S,C166079,Polarity marked on silkscreen; BAT+ and GND
+J6,JST-GH2 Mic Pigtail,Connector_JST:JST_GH_SM02B-GHS-TB_1x02-1MP_P1.25mm_Horizontal,1,Serviceable mic pigtail to Knowles MEMS in helmet,SM02B-GHS-TB,C160404,Short pigtail ~200mm; splits to MIC1 board mount and GND
+J7,2.5mm PTT Jack,Connector_AudioJack:AudioJack2_SwitchT,1,External wired PTT input (handlebar button),CUI SJ-2523-SMT,C145890,Tip to IO15 via R2 10k pullup; sleeve to GND
+SW1,EC11 Vol+Mute,Rotary_Encoder:RotaryEncoder_Alps_EC11E-Switch_Vertical_H20mm,1,Socketed rotary encoder volume + push-to-mute,EC11E15244B1,C255515,Socketed for serviceability; 5-pin through-hole socket
+D1,WS2812B-2020,LED_SMD:LED_WS2812B-2020,1,Addressable RGB status LED,WS2812B-2020,C965555,BT state per radio: color code in firmware; R6 100R series
+FB1,BLM18PG221SN1,Inductor_SMD:L_0402_1005Metric,1,Ferrite bead PCM5102 AVDD isolation,BLM18PG221SN1D,C16934,Between +3V3 digital rail and PCM5102 AVDD pin
+C1,10uF 0402,Capacitor_SMD:C_0402_1005Metric,1,ESP32 3V3 bulk decoupling,GRM155R61A106ME11,C19702,Within 2mm of ESP32 3V3
+C2,100nF 0402,Capacitor_SMD:C_0402_1005Metric,1,ESP32 3V3 HF bypass,GRM155R71C104KA88,C307331,
+C3,10uF 0402,Capacitor_SMD:C_0402_1005Metric,1,PCM5102 AVDD bulk (after FB1),GRM155R61A106ME11,C19702,
+C4,100nF 0402,Capacitor_SMD:C_0402_1005Metric,1,PCM5102 AVDD HF bypass,GRM155R71C104KA88,C307331,
+C5,1uF 0402,Capacitor_SMD:C_0402_1005Metric,1,TPA6132 VDD bypass,GRM155R60J105KE19,C52923,Within 1mm of VDD pin
+C6,10uF 0402,Capacitor_SMD:C_0402_1005Metric,1,BM62-A VDD bulk decoupling,GRM155R61A106ME11,C19702,
+C7,100nF 0402,Capacitor_SMD:C_0402_1005Metric,1,BM62-A VDD HF bypass,GRM155R71C104KA88,C307331,
+C8,10uF 0402,Capacitor_SMD:C_0402_1005Metric,1,BM62-B VDD bulk decoupling,GRM155R61A106ME11,C19702,
+C9,100nF 0402,Capacitor_SMD:C_0402_1005Metric,1,BM62-B VDD HF bypass,GRM155R71C104KA88,C307331,
+R1,10k 0402,Resistor_SMD:R_0402_1005Metric,1,MCP73831 PROG — sets charge current to 100mA,RC0402FR-0710KL,C98220,Formula: Iprog=1000/Rprog. 10k=100mA for 400mAh cell
+R2,10k 0402,Resistor_SMD:R_0402_1005Metric,1,J7 PTT_EXT pullup to 3V3,RC0402FR-0710KL,C98220,
+R3,10k 0402,Resistor_SMD:R_0402_1005Metric,1,EC11 ENC_A pullup,RC0402FR-0710KL,C98220,
+R4,10k 0402,Resistor_SMD:R_0402_1005Metric,1,EC11 ENC_B pullup,RC0402FR-0710KL,C98220,
+R5,10k 0402,Resistor_SMD:R_0402_1005Metric,1,EC11 ENC_SW pullup,RC0402FR-0710KL,C98220,
+R6,100R 0402,Resistor_SMD:R_0402_1005Metric,1,WS2812B data line series,RC0402FR-07100RL,C98257,Prevents ringing on fast NZR edges
+R7,5.1k 0402,Resistor_SMD:R_0402_1005Metric,1,USB-C CC1 sink,RC0402FR-075K1L,C138392,Required for USB-C 5V charging negotiation
+R8,5.1k 0402,Resistor_SMD:R_0402_1005Metric,1,USB-C CC2 sink,RC0402FR-075K1L,C138392,
+R9,10k 0402,Resistor_SMD:R_0402_1005Metric,1,BAT_DATA NTC pullup to 3V3,RC0402FR-0710KL,C98220,Divider for pack NTC thermistor temp sensing on IO3
+R10,10k 0402,Resistor_SMD:R_0402_1005Metric,1,J3 WIRED_PTT_IN pullup to 3V3,RC0402FR-0710KL,C98220,PTT ring on TRRS jack; active low
+R11,0R/GND 0402,Resistor_SMD:R_0402_1005Metric,1,TPS2116 PR pin — GND = IN1 (main pack) always preferred,RC0402FR-070RL,C105872,Tie to GND; IN1=main pack prioritised over IN2=keep-alive
+,,,,,,BATTERY PACKS (separate PCBs — not on main unit),,,
+BAT_SLIM,LP805060 protected,n/a,1,Slim pack: 1x 2000mAh flat LiPo cell,LP805060,n/a,~7hr; 80x50x6mm; BQ25895 + USB-C on pack PCB
+BAT_STD_x2,LP805060 protected,n/a,2,Standard pack: 2x 2000mAh parallel = 4000mAh,LP805060,n/a,~14hr; recommended for WABDR days
+BAT_CHONK_x4,LP805060 protected,n/a,4,Chonker pack: 4x 2000mAh parallel = 8000mAh,LP805060,n/a,~28hr; 2x IP5306 on pack PCB for 2A charge
+BAT_PACK_IC,BQ25895RTWR,Package_QFN,1,Fast charge IC per battery pack (3A capable),BQ25895RTWR,C73525,One per pack PCB; USB-C PD negotiation up to 9V/2A input
+BAT_PACK_NTC,NCP18XH103F03RB,n/a,1,10k NTC thermistor per pack,NCP18XH103F03RB,C86321,Wired to DATA/NTC pogo pin; read by ESP32 IO3
+BAT_KEEPALIVE,LP401230 protected,n/a,1,Keep-alive onboard cell 400mAh JST-PH2,LP401230,n/a,40x12x3mm; charged by U9 MCP73831 at 100mA; ~1.4hr runtime
+,,,,,,MECHANICAL,,,
+POGO_PINS,P75-E2,n/a,8,Spring-loaded pogo pins (4x battery + 4x helmet spare),P75-E2 1.0mm,n/a,1.0mm dia; 3.5mm stroke; gold-plated tip
+MAGNETS_BAT,N52 disc 8x3mm,n/a,4,Battery contact alignment+retention magnets (2 per unit side),N52 neodymium,n/a,Opposing polarity for auto-keying; ~1.8kg pull force per pair
+MAGNETS_HELM,N52 disc 6x2mm,n/a,4,Helmet connector alignment magnets,N52 neodymium,n/a,
+HEAT_INSERTS,M2x3mm brass,n/a,4,PCB-to-enclosure mounting,M2x3 heat insert,n/a,Install with soldering iron into ASA print
+ENCLOSURE,ASA filament,Bambu X1C,1,Main unit enclosure 80x50x18mm,Generic ASA,n/a,UV+heat stable; 0.2mm layer 4 walls 40% gyroid
+IEM,KZ ZSN Pro,n/a,2,In-ear monitors detachable cable (1 per rider),KZ ZSN Pro,n/a,16-32 Ohm; 112dB/mW sensitivity; 2-pin detachable cable
+CABLE_K1,K1 adapter cable,n/a,2,TRRS-to-K1 radio cable (supplied with unit),DIY / sourced,n/a,3.5mm TRRS plug → 3.5mm + 2.5mm K1 plug; BTECH/Baofeng/Kenwood native
